@@ -415,7 +415,10 @@ async def get_model_stats():
     """Obtener estadísticas del modelo ML"""
     try:
         stats = predictor.get_model_stats()
-        return stats
+        return {
+            "modelo_cargado": True,
+            "estadisticas": stats
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
 
@@ -550,4 +553,3 @@ async def health_check(db: Session = Depends(get_db)):
             "error": str(e),
             "database_ok": False
         }
-
