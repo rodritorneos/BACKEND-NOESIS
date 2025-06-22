@@ -550,3 +550,19 @@ async def health_check(db: Session = Depends(get_db)):
             "error": str(e),
             "database_ok": False
         }
+        
+import os
+from fastapi import Response
+
+@app.get("/descargar-modelo")
+async def descargar_modelo():
+    """Descarga el modelo entrenado si existe en la carpeta del proyecto"""
+    path = "model_noesis.pkl"
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return Response(
+                f.read(),
+                media_type="application/octet-stream",
+                headers={"Content-Disposition": "attachment; filename=model_noesis.pkl"}
+            )
+    return {"error": "Modelo no encontrado"}
