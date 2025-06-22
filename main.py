@@ -551,11 +551,3 @@ async def health_check(db: Session = Depends(get_db)):
             "database_ok": False
         }
 
-@app.get("/modelo/stats/training", response_model=dict)
-async def get_model_training_stats():
-    """Obtener todas las métricas de entrenamiento del modelo"""
-    try:
-        stats = predictor.get_model_stats()
-        return stats
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error obteniendo métricas de entrenamiento: {str(e)}")

@@ -37,7 +37,9 @@ class ModelPredictor:
         self.reverse_class_mapping = {0: "Verb to be", 1: "Present Simple", 2: "The verb can", 3: "Future Perfect"}
 
         # Intenta primero cargar modelo desde .pkl
-        if not self.load_model_from_file():
+        if self.load_model_from_file():
+            self._generate_model_stats_from_loaded_model()
+        else:
             self.train_model()
 
     def load_model_from_file(self, path: str = "model_noesis.pkl") -> bool:
@@ -53,7 +55,47 @@ class ModelPredictor:
         except Exception as e:
             logger.error(f"❌ Error al cargar el modelo desde archivo: {e}")
             return False
-                
+
+    def _generate_model_stats_from_loaded_model(self) -> None:
+        """Genera statistics para self.model_stats cuando cargamos un modelo entrenado desde .pkl."""
+        try:
+            df = self.load_real_data()
+            if df is None or len(df) < 1:
+                logger.warning("⚠️ No se encontraron datos para generar stats.")
+                return
+
+            df["nivel_cod"] = df["nivel"].map(self.level_mapping)
+            X = df[self.feature_names]
+            y = df["nivel_cod"]
+
+            if X.isnull().sum().sum() > 0:
+                mask = ~(X.isnull().any(axis=1) | y.isnull())
+                X = X[mask]
+                y = y[mask]
+
+            train_accuracy = None
+            test_accuracy = None
+            if len(df) > 10:
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=0.2, random_state=42, stratify=y
+                )
+                y_train_pred = self.model.predict(X_train)
+                y_test_pred = self.model.predict(X_test)
+                train_accuracy = accuracy_score(y_train, y_train_pred)
+                test_accuracy = accuracy_score(y_test, y_test_pred)
+
+            self.model_stats = {
+                "train_accuracy": round(train_accuracy, 4) if train_accuracy is not None else None,
+                "test_accuracy": round(test_accuracy, 4) if test_accuracy is not None else None,
+                "n_samples_total": len(df),
+                "data_source": "loaded_model",
+                "feature_importance": dict(zip(self.feature_names, self.model.feature_importances_.round(4))),
+                "class_distribution": df["nivel"].value_counts().to_dict()
+            }
+            logger.info("📊 Stats generadas para modelo cargado.")
+        except Exception as e:
+            logger.warning(f"⚠️ No se pudieron generar stats para el modelo cargado: {e}")
+
     def load_real_data(self) -> pd.DataFrame:
         """
         Cargar datos reales desde el CSV
