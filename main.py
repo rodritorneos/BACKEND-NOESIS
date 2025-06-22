@@ -551,16 +551,11 @@ async def health_check(db: Session = Depends(get_db)):
             "database_ok": False
         }
 
-@app.get("/modelo/info_detallada")
-async def obtener_informacion_detallada_modelo():
-    """Obtener información de entrenamiento, pruebas y detalles del modelo, junto a la ruta del dataset utilizado"""
+@app.get("/modelo/stats/training", response_model=dict)
+async def get_model_training_stats():
+    """Obtener todas las métricas de entrenamiento del modelo"""
     try:
         stats = predictor.get_model_stats()
-        dataset_info = predictor.get_dataset_info()
-        return {
-            "estadisticas_modelo": stats,
-            "dataset_info": dataset_info,
-            "dataset_path": predictor.csv_path
-        }
+        return stats
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error obteniendo la información del modelo: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo métricas de entrenamiento: {str(e)}")
