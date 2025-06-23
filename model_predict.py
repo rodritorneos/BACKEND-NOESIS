@@ -92,7 +92,9 @@ class ModelPredictor:
                 "feature_importance": dict(zip(self.feature_names, self.model.feature_importances_.round(4))),
                 "class_distribution": df["nivel"].value_counts().to_dict()
             }
-            logger.info("📊 Stats generadas para modelo cargado.")
+
+            import json
+            logger.info(f"📊 Stats generadas para modelo cargado:\n{json.dumps(self.model_stats, indent=2, ensure_ascii=False)}")
         except Exception as e:
             logger.warning(f"⚠️ No se pudieron generar stats para el modelo cargado: {e}")
 
