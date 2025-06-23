@@ -17,6 +17,12 @@ class UsuarioResponse(BaseModel):
 class UsuarioInfo(BaseModel):
     email: str
 
+class UsuarioUpdateProfile(BaseModel):
+    email: str
+
+class UsuarioChangePassword(BaseModel):
+    new_password: str
+
 # Schemas para Favorito
 class FavoritoRequest(BaseModel):
     clase_id: str

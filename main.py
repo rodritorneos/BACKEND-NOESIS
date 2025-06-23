@@ -12,12 +12,12 @@ from schemas import ModelPredictUserRequest, ModelPredictUserResponse, ModelUser
 from database import engine, get_db
 from models import Usuario, Favorito, Visita, Puntaje, Base
 from schemas import (
-    UsuarioRegistro, UsuarioLogin, UsuarioResponse, UsuarioInfo,
+    UsuarioRegistro, UsuarioLogin, UsuarioResponse, UsuarioInfo, 
     FavoritoRequest, FavoritoResponse, FavoritosUsuarioResponse, FavoritoAddResponse,
     VisitaRequest, VisitaResponse, VisitasUsuarioResponse,
     PuntajeRequest, PuntajeResponse, PuntajeUpdateResponse,
     MessageResponse, RegistroResponse, LoginResponse,
-    HealthResponse, RootResponse
+    HealthResponse, RootResponse, UsuarioUpdateProfile, UsuarioChangePassword
 )
 
 # Agregar logger
@@ -144,6 +144,50 @@ async def eliminar_usuario(email: str, db: Session = Depends(get_db)):
     db.commit()
     
     return {"message": "Usuario, favoritos, visitas y puntajes eliminados exitosamente"}
+
+@app.put("/usuarios/{email}/perfil", response_model=MessageResponse)
+async def actualizar_perfil_usuario(
+    email: str, 
+    perfil_actualizado: UsuarioUpdateProfile, 
+    db: Session = Depends(get_db)
+):
+    """Actualizar perfil de usuario (email)"""
+    usuario = get_user_by_email(db, email)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Verificar si el nuevo email ya existe (si es diferente al actual)
+    if perfil_actualizado.email != email:
+        usuario_existente = get_user_by_email(db, perfil_actualizado.email)
+        if usuario_existente:
+            raise HTTPException(status_code=400, detail="El nuevo email ya está registrado")
+    
+    # Actualizar el email del usuario
+    usuario.email = perfil_actualizado.email
+    
+    # Si tu modelo Usuario tiene campo username, descomenta la siguiente línea
+    # usuario.username = perfil_actualizado.username
+    
+    db.commit()
+    
+    return {"message": "Perfil actualizado exitosamente"}
+
+@app.put("/usuarios/{email}/password", response_model=MessageResponse)
+async def cambiar_contraseña_usuario(
+    email: str, 
+    password_data: UsuarioChangePassword, 
+    db: Session = Depends(get_db)
+):
+    """Cambiar contraseña de usuario"""
+    usuario = get_user_by_email(db, email)
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    
+    # Actualizar la contraseña
+    usuario.password = password_data.new_password
+    db.commit()
+    
+    return {"message": "Contraseña actualizada correctamente"}
 
 # Endpoints de favoritos
 @app.post("/usuarios/{email}/favoritos", response_model=FavoritoAddResponse)
