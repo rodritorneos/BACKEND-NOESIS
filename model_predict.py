@@ -57,11 +57,10 @@ class ModelPredictor:
             return False
 
     def _generate_model_stats_from_loaded_model(self) -> None:
-        """Genera statistics para self.model_stats cuando cargamos un modelo entrenado desde .pkl."""
+        """Inicializa las statistics para self.model_stats sin mostrar detalles en el log."""
         try:
             df = self.load_real_data()
             if df is None or len(df) < 1:
-                logger.warning("⚠️ No se encontraron datos para generar stats.")
                 return
 
             df["nivel_cod"] = df["nivel"].map(self.level_mapping)
@@ -92,9 +91,6 @@ class ModelPredictor:
                 "feature_importance": dict(zip(self.feature_names, self.model.feature_importances_.round(4))),
                 "class_distribution": df["nivel"].value_counts().to_dict()
             }
-
-            import json
-            logger.info(f"📊 Stats generadas para modelo cargado:\n{json.dumps(self.model_stats, indent=2, ensure_ascii=False)}")
         except Exception as e:
             logger.warning(f"⚠️ No se pudieron generar stats para el modelo cargado: {e}")
 

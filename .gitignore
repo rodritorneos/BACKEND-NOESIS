@@ -1,0 +1,6 @@
+# Excluir el entorno virtual
+.venv/
+
+# Excluir los archivos de caché de Python
+__pycache__/
+*.py[cod]
