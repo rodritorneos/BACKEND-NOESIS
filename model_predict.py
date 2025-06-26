@@ -23,6 +23,7 @@ class ModelPredictor:
         self.model = None
         self.model_stats = None
         self.csv_path = csv_path
+        self._cached_data = None
         self.feature_names = ["puntaje_obtenido", "puntaje_total", "relacion_puntaje", "clase_mas_recurrida_cod"]
         self.level_mapping = {"Básico": 0, "Intermedio": 1, "Avanzado": 2}
         self.reverse_mapping = {0: "Básico", 1: "Intermedio", 2: "Avanzado"}
@@ -100,8 +101,11 @@ class ModelPredictor:
 
     def load_real_data(self) -> pd.DataFrame:
         """
-        Cargar datos reales desde el CSV
+        Cargar datos reales desde el CSV (con caché para no recargar múltiples veces)
         """
+            if hasattr(self, "_cached_data") and self._cached_data is not None:
+                logger.debug(f"✅ Devolviendo datos cacheados ({len(self._cached_data)} registros).")
+                return self._cached_data
         try:
             if not os.path.exists(self.csv_path):
                 raise FileNotFoundError(f"No se encontró el archivo: {self.csv_path}")
@@ -142,9 +146,11 @@ class ModelPredictor:
             
             logger.info(f"   • Rango de puntajes: {df['puntaje_obtenido'].min()}-{df['puntaje_obtenido'].max()}")
             logger.info(f"   • Rango de porcentajes: {df['relacion_puntaje'].min():.2f}-{df['relacion_puntaje'].max():.2f}")
-            
+                    
+            # Guardamos en caché
+            self._cached_data = df
             return df
-            
+
         except Exception as e:
             logger.error(f"❌ Error cargando datos reales: {e}")
             raise e
