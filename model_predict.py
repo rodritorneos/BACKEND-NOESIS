@@ -9,9 +9,9 @@ import os
 import logging
 import joblib
 
-# Configurar logging para permitir DEBUG en detalles
+# Configurar logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
@@ -23,7 +23,6 @@ class ModelPredictor:
         self.model = None
         self.model_stats = None
         self.csv_path = csv_path
-        self._cached_data = None
         self.feature_names = ["puntaje_obtenido", "puntaje_total", "relacion_puntaje", "clase_mas_recurrida_cod"]
         self.level_mapping = {"Básico": 0, "Intermedio": 1, "Avanzado": 2}
         self.reverse_mapping = {0: "Básico", 1: "Intermedio", 2: "Avanzado"}
@@ -41,7 +40,7 @@ class ModelPredictor:
         if self.load_model_from_file():
             self._generate_model_stats_from_loaded_model()
         else:
-            self.train_model() 
+            self.train_model()
 
     def load_model_from_file(self, path: str = "model_noesis.pkl") -> bool:
         """Carga el modelo desde un archivo .pkl si existe."""
@@ -58,10 +57,11 @@ class ModelPredictor:
             return False
 
     def _generate_model_stats_from_loaded_model(self) -> None:
-        """Inicializa las statistics para self.model_stats sin mostrar detalles en el log."""
+        """Genera statistics para self.model_stats cuando cargamos un modelo entrenado desde .pkl."""
         try:
             df = self.load_real_data()
             if df is None or len(df) < 1:
+                logger.warning("⚠️ No se encontraron datos para generar stats.")
                 return
 
             df["nivel_cod"] = df["nivel"].map(self.level_mapping)
@@ -92,26 +92,25 @@ class ModelPredictor:
                 "feature_importance": dict(zip(self.feature_names, self.model.feature_importances_.round(4))),
                 "class_distribution": df["nivel"].value_counts().to_dict()
             }
+
+            import json
+            logger.info(f"📊 Stats generadas para modelo cargado:\n{json.dumps(self.model_stats, indent=2, ensure_ascii=False)}")
         except Exception as e:
             logger.warning(f"⚠️ No se pudieron generar stats para el modelo cargado: {e}")
 
     def load_real_data(self) -> pd.DataFrame:
         """
-        Cargar datos reales desde el CSV (con caché para no recargar múltiples veces)
+        Cargar datos reales desde el CSV
         """
-        if hasattr(self, "_cached_data") and self._cached_data is not None:
-            logger.debug(f"✅ Devolviendo datos cacheados ({len(self._cached_data)} registros).")
-            return self._cached_data
-
         try:
             if not os.path.exists(self.csv_path):
                 raise FileNotFoundError(f"No se encontró el archivo: {self.csv_path}")
             
-            logger.debug(f"📁 Cargando datos desde: {self.csv_path}")
+            logger.info(f"📁 Cargando datos desde: {self.csv_path}")
             df = pd.read_csv(self.csv_path)
 
-            logger.debug(f"✅ Datos cargados: {len(df)} registros")
-            logger.debug(f"📊 Columnas encontradas: {list(df.columns)}")
+            logger.info(f"✅ Datos cargados: {len(df)} registros")
+            logger.info(f"📊 Columnas encontradas: {list(df.columns)}")
             
             # Validar columnas requeridas
             required_columns = ["puntaje_obtenido", "puntaje_total", "relacion_puntaje", 
@@ -130,22 +129,20 @@ class ModelPredictor:
                 logger.info(f"📝 Registros válidos después del filtrado: {len(df)}")
             
             # Mostrar estadísticas del dataset
-            logger.debug(f"\n📈 ESTADÍSTICAS DEL DATASET:")
-            logger.debug(f"   • Total registros: {len(df)}")
-            logger.debug(f"   • Distribución por nivel:")
+            logger.info(f"\n📈 ESTADÍSTICAS DEL DATASET:")
+            logger.info(f"   • Total registros: {len(df)}")
+            logger.info(f"   • Distribución por nivel:")
             for nivel, count in df["nivel"].value_counts().items():
-                logger.debug(f"     - {nivel}: {count} ({count/len(df)*100:.1f}%)")
+                logger.info(f"     - {nivel}: {count} ({count/len(df)*100:.1f}%)")
             
             if "clase_mas_recurrida_txt" in df.columns:
-                logger.debug(f"   • Clases más frecuentes:")
+                logger.info(f"   • Clases más frecuentes:")
                 for clase, count in df["clase_mas_recurrida_txt"].value_counts().head().items():
-                    logger.debug(f"     - {clase}: {count}")
+                    logger.info(f"     - {clase}: {count}")
             
-            logger.debug(f"   • Rango de puntajes: {df['puntaje_obtenido'].min()}-{df['puntaje_obtenido'].max()}")
-            logger.debug(f"   • Rango de porcentajes: {df['relacion_puntaje'].min():.2f}-{df['relacion_puntaje'].max():.2f}")
+            logger.info(f"   • Rango de puntajes: {df['puntaje_obtenido'].min()}-{df['puntaje_obtenido'].max()}")
+            logger.info(f"   • Rango de porcentajes: {df['relacion_puntaje'].min():.2f}-{df['relacion_puntaje'].max():.2f}")
             
-            #  Guardamos en caché
-            self._cached_data = df
             return df
             
         except Exception as e:
@@ -199,10 +196,10 @@ class ModelPredictor:
             try:
                 df = self.load_real_data()
                 data_source = "real_data"
-                logger.debug("🎯 Usando datos reales para entrenamiento")
+                logger.info("🎯 Usando datos reales para entrenamiento")
             except Exception as e:
                 logger.warning(f"⚠️ No se pudieron cargar datos reales: {e}")
-                logger.debug("🔄 Generando datos sintéticos como fallback...")
+                logger.info("🔄 Generando datos sintéticos como fallback...")
                 df = self.generate_synthetic_data(2000)
                 data_source = "synthetic_data"
             
@@ -233,7 +230,7 @@ class ModelPredictor:
             )
             
             # Entrenar el modelo
-            logger.debug("🤖 Entrenando modelo Random Forest...")
+            logger.info("🤖 Entrenando modelo Random Forest...")
             self.model = RandomForestClassifier(
                 n_estimators=100, 
                 random_state=42,
@@ -266,15 +263,14 @@ class ModelPredictor:
             }
             
             logger.info(f"\n✅ MODELO ENTRENADO EXITOSAMENTE!")
-            logger.debug(f"📊 Fuente de datos: {data_source}")
-            logger.debug(f"📝 Total de datos: {len(df)}")
-            logger.debug(f"🎯 Precisión en entrenamiento: {train_accuracy:.4f}")
-            logger.debug(f"🎯 Precisión en prueba: {test_accuracy:.4f}")
-            logger.debug(f"📈 Distribución de clases: {df['nivel'].value_counts().to_dict()}")
-            logger.debug(f"🔍 Importancia de características:")
-
+            logger.info(f"📊 Fuente de datos: {data_source}")
+            logger.info(f"📝 Total de datos: {len(df)}")
+            logger.info(f"🎯 Precisión en entrenamiento: {train_accuracy:.4f}")
+            logger.info(f"🎯 Precisión en prueba: {test_accuracy:.4f}")
+            logger.info(f"📈 Distribución de clases: {df['nivel'].value_counts().to_dict()}")
+            logger.info(f"🔍 Importancia de características:")
             for feature, importance in self.model_stats["feature_importance"].items():
-                logger.debug(f"   • {feature}: {importance:.4f}")
+                logger.info(f"   • {feature}: {importance:.4f}")
 
             # Guardamos el modelo
             joblib.dump(self.model, "model_noesis.pkl")
@@ -392,10 +388,8 @@ class ModelPredictor:
     
     def get_model_stats(self) -> Dict[str, Any]:
         """Obtener estadísticas del modelo"""
-        if not self.model_stats and self.model:
-            self._generate_model_stats_from_loaded_model()
         if not self.model_stats:
-            return {"error": "Modelo no entrenado o sin estadísticas disponibles"} 
+            return {"error": "Modelo no entrenado"}
         
         return {
             **self.model_stats,
