@@ -11,19 +11,20 @@ from schemas import ModelPredictUserRequest, ModelPredictUserResponse, ModelUser
 
 from database import engine, get_db
 from models import Usuario, Favorito, Visita, Puntaje, Base
-
 from schemas import (
-    UsuarioRegistro, UsuarioLogin, UsuarioResponse, UsuarioInfo,
+    UsuarioRegistro, UsuarioLogin, UsuarioResponse, UsuarioInfo, 
     FavoritoRequest, FavoritoResponse, FavoritosUsuarioResponse, FavoritoAddResponse,
     VisitaRequest, VisitaResponse, VisitasUsuarioResponse,
     PuntajeRequest, PuntajeResponse, PuntajeUpdateResponse,
     MessageResponse, RegistroResponse, LoginResponse,
-    HealthResponse, RootResponse
+    HealthResponse, RootResponse, UsuarioUpdateProfile, UsuarioChangePassword
 )
 
-from schemas import UsuarioUpdateProfile, UsuarioChangePassword
+# Agregar logger
+import logging
+logger = logging.getLogger(__name__)
 
-# Crear las tablas
+# Crear las tablas en PostgreSQL si no existen
 Base.metadata.create_all(bind=engine)
 
 # Crear la aplicación FastAPI
@@ -194,7 +195,6 @@ async def cambiar_contraseña_usuario(
     db.commit()
     
     return {"message": "Contraseña actualizada correctamente"}
-
 
 # Endpoints de favoritos
 @app.post("/usuarios/{email}/favoritos", response_model=FavoritoAddResponse)
@@ -385,70 +385,6 @@ async def obtener_puntajes_usuario(email: str, db: Session = Depends(get_db)):
         "nivel": puntaje.nivel
     }
 
-# @app.post("/usuarios/{email}/puntajes", response_model=PuntajeUpdateResponse)
-# async def actualizar_puntajes_usuario(email: str, puntaje_request: PuntajeRequest, db: Session = Depends(get_db)):
-#     """Actualizar los puntajes de un usuario solo si es mejor que el anterior, con predicción ML automática"""
-#     usuario = get_user_by_email(db, email)
-#     if not usuario:
-#         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-#     puntaje = db.query(Puntaje).filter(Puntaje.usuario_id == usuario.id).first()
-#     is_new_best = False
-#     nivel_usado = puntaje_request.nivel  # Usar el nivel enviado por defecto
-    
-#     # Intentar obtener predicción ML para mejorar el nivel
-#     try:
-#         ml_prediction = predictor.predict_level(
-#             score_obtained=puntaje_request.puntaje_obtenido,
-#             total_score=puntaje_request.puntaje_total
-#         )
-#         nivel_ml = ml_prediction['nivel_predicho']
-        
-#         # Usar el nivel ML si tiene alta confianza (>0.7) o si es mejor que el enviado
-#         confianza = ml_prediction.get('confianza', 0)
-#         if confianza > 0.7 or _compare_levels(nivel_ml, puntaje_request.nivel):
-#             nivel_usado = nivel_ml
-            
-#     except Exception as e:
-#         print(f"Error en predicción ML, usando nivel manual: {e}")
-#         # Continuar con el nivel enviado en la request
-    
-#     if not puntaje:
-#         # Crear nuevo puntaje
-#         puntaje = Puntaje(
-#             usuario_id=usuario.id,
-#             puntaje_obtenido=puntaje_request.puntaje_obtenido,
-#             puntaje_total=puntaje_request.puntaje_total,
-#             nivel=nivel_usado
-#         )
-#         db.add(puntaje)
-#         is_new_best = True
-#     else:
-#         # Comparar porcentajes
-#         porcentaje_actual = (puntaje.puntaje_obtenido / puntaje.puntaje_total) * 100
-#         porcentaje_nuevo = (puntaje_request.puntaje_obtenido / puntaje_request.puntaje_total) * 100
-        
-#         if porcentaje_nuevo > porcentaje_actual:
-#             puntaje.puntaje_obtenido = puntaje_request.puntaje_obtenido
-#             puntaje.puntaje_total = puntaje_request.puntaje_total
-#             puntaje.nivel = nivel_usado
-#             is_new_best = True
-    
-#     db.commit()
-    
-#     return {
-#         "message": "Puntaje procesado exitosamente" + (" con ML" if nivel_usado != puntaje_request.nivel else ""),
-#         "data": {
-#             "is_new_best": is_new_best,
-#             "puntaje_obtenido": puntaje_request.puntaje_obtenido,
-#             "puntaje_total": puntaje_request.puntaje_total,
-#             "nivel": nivel_usado,
-#             "nivel_original": puntaje_request.nivel,
-#             "ml_enhanced": nivel_usado != puntaje_request.nivel
-#         }
-#     }
-
-
 @app.post("/usuarios/{email}/puntajes", response_model=PuntajeUpdateResponse)
 async def actualizar_puntajes_usuario(email: str, puntaje_request: PuntajeRequest, db: Session = Depends(get_db)):
     """Actualizar los puntajes de un usuario solo si es mejor que el anterior, con predicción ML automática"""
@@ -500,7 +436,7 @@ async def actualizar_puntajes_usuario(email: str, puntaje_request: PuntajeReques
     
     db.commit()
     
-    # ✅ CORRECCIÓN: Retornar estructura correcta sin duplicar is_new_best
+    # Retornar estructura correcta sin duplicar is_new_best
     return {
         "message": "Puntaje procesado exitosamente" + (" con ML" if nivel_usado != puntaje_request.nivel else ""),
         "data": {
@@ -511,7 +447,7 @@ async def actualizar_puntajes_usuario(email: str, puntaje_request: PuntajeReques
             "nivel_original": puntaje_request.nivel,
             "ml_enhanced": nivel_usado != puntaje_request.nivel
         }
-        # ✅ ELIMINAR: No agregar is_new_best duplicado aquí
+        # No agregar is_new_best duplicado aquí
     }
 
 # Agregar estas rutas antes del endpoint /health
@@ -532,7 +468,10 @@ async def get_model_stats():
     """Obtener estadísticas del modelo ML"""
     try:
         stats = predictor.get_model_stats()
-        return stats
+        return {
+            "modelo_cargado": True,
+            "estadisticas": stats
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
 
@@ -630,9 +569,9 @@ async def get_user_model_stats(email: str, db: Session = Depends(get_db)):
 async def root():
     """Endpoint raíz de la API"""
     return {
-        "message": "API de usuarios, favoritos, visitas y puntajes SQLite",
+        "message": "API de usuarios, favoritos, visitas y puntajes",
         "version": "2.0.0",
-        "database": "SQLite",
+        "database": "PostgreSQL (Render)",
         "endpoints": {
             "usuarios": "/usuarios/{email}",
             "registro": "/usuarios/registro",
@@ -654,7 +593,7 @@ async def health_check(db: Session = Depends(get_db)):
         
         return {
             "status": "healthy",
-            "database": "SQLite",
+            "database": "PostgreSQL (Render)",
             "usuarios_registrados": usuarios_count,
             "total_favoritos": favoritos_count,
             "total_visitas": visitas_count,
