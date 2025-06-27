@@ -4,11 +4,11 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Leer la URL de conexión desde la variable de entorno personalizada
-DATABASE_URL = os.getenv("NOESIS_URL")
+DATABASE_URL = os.getenv("URL_NOESIS")
 
 # Validar que esté definida
 if not DATABASE_URL:
-    raise ValueError("La variable de entorno 'NOESIS_URL' no está definida.")
+    raise ValueError("La variable de entorno 'URL_NOESIS' no está definida.")
 
 # Crear el motor de conexión a PostgreSQL (ya no se necesita connect_args)
 engine = create_engine(DATABASE_URL)

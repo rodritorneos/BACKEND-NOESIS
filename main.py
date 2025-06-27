@@ -563,7 +563,6 @@ async def get_user_model_stats(email: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {str(e)}")
 
 
-
 # Endpoints de información general
 @app.get("/", response_model=RootResponse)
 async def root():
