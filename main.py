@@ -43,8 +43,13 @@ app.add_middleware(
 def get_user_by_email(db: Session, email: str):
     return db.query(Usuario).filter(Usuario.email == email).first()
 
-def create_user(db: Session, email: str, password: str):
-    db_user = Usuario(email=email, password=password)
+# NUEVA función auxiliar para buscar por username
+def get_user_by_username(db: Session, username: str):
+    return db.query(Usuario).filter(Usuario.username == username).first()
+
+# Función create_user actualizada
+def create_user(db: Session, username: str, email: str, password: str):
+    db_user = Usuario(username=username, email=email, password=password)  # ← INCLUIR USERNAME
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -91,10 +96,9 @@ def _generate_user_recommendation(puntaje: Puntaje, prediction: dict) -> str:
 # Endpoints de usuarios
 @app.get("/usuarios", response_model=List[UsuarioResponse])
 async def get_usuarios(db: Session = Depends(get_db)):
-    """Obtener todos los usuarios (solo email y password para compatibilidad)"""
+    """Obtener todos los usuarios con username incluido"""
     usuarios = db.query(Usuario).all()
-    # Manteniendo compatibilidad con el frontend actual
-    return [{"email": user.email, "password": user.password} for user in usuarios]
+    return [{"username": user.username, "email": user.email, "password": user.password} for user in usuarios]
 
 @app.post("/usuarios/registro", response_model=RegistroResponse)
 async def registrar_usuario(usuario: UsuarioRegistro, db: Session = Depends(get_db)):
@@ -103,8 +107,12 @@ async def registrar_usuario(usuario: UsuarioRegistro, db: Session = Depends(get_
     if get_user_by_email(db, usuario.email):
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     
-    # Crear nuevo usuario
-    nuevo_usuario = create_user(db, usuario.email, usuario.password)
+    # NUEVA VALIDACIÓN: Verificar si el username ya existe
+    if get_user_by_username(db, usuario.username):
+        raise HTTPException(status_code=400, detail="El username ya está registrado")
+    
+    # Crear nuevo usuario con username
+    nuevo_usuario = create_user(db, usuario.username, usuario.email, usuario.password)
     
     return {"message": "Usuario registrado exitosamente", "email": usuario.email}
 
@@ -129,7 +137,7 @@ async def obtener_usuario(email: str, db: Session = Depends(get_db)):
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    return {"email": usuario.email}
+    return {"username": usuario.username, "email": usuario.email}  # ← INCLUIR USERNAME
 
 @app.delete("/usuarios/{email}", response_model=MessageResponse)
 async def eliminar_usuario(email: str, db: Session = Depends(get_db)):
@@ -145,32 +153,31 @@ async def eliminar_usuario(email: str, db: Session = Depends(get_db)):
     
     return {"message": "Usuario, favoritos, visitas y puntajes eliminados exitosamente"}
 
+
 @app.put("/usuarios/{email}/perfil", response_model=MessageResponse)
 async def actualizar_perfil_usuario(
     email: str, 
     perfil_actualizado: UsuarioUpdateProfile, 
     db: Session = Depends(get_db)
 ):
-    """Actualizar perfil de usuario (email)"""
+    """Actualizar perfil de usuario (solo username)"""
     usuario = get_user_by_email(db, email)
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
-    # Verificar si el nuevo email ya existe (si es diferente al actual)
-    if perfil_actualizado.email != email:
-        usuario_existente = get_user_by_email(db, perfil_actualizado.email)
+    # Verificar si el nuevo username ya existe (si es diferente al actual)
+    if perfil_actualizado.username != usuario.username:
+        usuario_existente = get_user_by_username(db, perfil_actualizado.username)
         if usuario_existente:
-            raise HTTPException(status_code=400, detail="El nuevo email ya está registrado")
+            raise HTTPException(status_code=400, detail="El nuevo username ya está registrado")
     
-    # Actualizar el email del usuario
-    usuario.email = perfil_actualizado.email
-    
-    # Si tu modelo Usuario tiene campo username, descomenta la siguiente línea
-    # usuario.username = perfil_actualizado.username
+    # Actualizar solo el username (el email se mantiene igual)
+    usuario.username = perfil_actualizado.username
     
     db.commit()
     
     return {"message": "Perfil actualizado exitosamente"}
+
 
 @app.put("/usuarios/{email}/password", response_model=MessageResponse)
 async def cambiar_contraseña_usuario(
@@ -403,7 +410,7 @@ async def actualizar_puntajes_usuario(email: str, puntaje_request: PuntajeReques
             nivel_usado = nivel_ml
             
     except Exception as e:
-        logger.warning(f"⚠️ Error en predicción ML, usando nivel manual: {e}")
+        print(f"Error en predicción ML, usando nivel manual: {e}")
         # Continuar con el nivel enviado en la request
     
     if not puntaje:
@@ -429,16 +436,18 @@ async def actualizar_puntajes_usuario(email: str, puntaje_request: PuntajeReques
     
     db.commit()
     
+    # Retornar estructura correcta sin duplicar is_new_best
     return {
         "message": "Puntaje procesado exitosamente" + (" con ML" if nivel_usado != puntaje_request.nivel else ""),
         "data": {
-            "is_new_best": is_new_best,
+            "is_new_best": is_new_best,  # ← ESTE ES EL VALOR CORRECTO
             "puntaje_obtenido": puntaje_request.puntaje_obtenido,
             "puntaje_total": puntaje_request.puntaje_total,
             "nivel": nivel_usado,
             "nivel_original": puntaje_request.nivel,
             "ml_enhanced": nivel_usado != puntaje_request.nivel
         }
+        # No agregar is_new_best duplicado aquí
     }
 
 # Agregar estas rutas antes del endpoint /health

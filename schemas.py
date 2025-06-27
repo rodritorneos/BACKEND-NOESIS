@@ -3,6 +3,7 @@ from typing import List, Optional, Any
 
 # Schemas para Usuario
 class UsuarioRegistro(BaseModel):
+    username: str 
     email: str
     password: str
 
@@ -11,14 +12,16 @@ class UsuarioLogin(BaseModel):
     password: str
 
 class UsuarioResponse(BaseModel):
+    username: str 
     email: str
     password: str
 
 class UsuarioInfo(BaseModel):
+    username: str 
     email: str
 
 class UsuarioUpdateProfile(BaseModel):
-    email: str
+    username: str  
 
 class UsuarioChangePassword(BaseModel):
     new_password: str
