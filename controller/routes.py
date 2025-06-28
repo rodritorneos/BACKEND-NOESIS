@@ -3,10 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 
-# Agregar estos imports al inicio
 from service.model_predict import predictor
 from view.schemas import ModelPredictRequest, ModelPredictResponse, ModelStatsResponse
-
 from view.schemas import ModelPredictUserRequest, ModelPredictUserResponse, ModelUserStatsResponse
 
 from database.database import engine, get_db
@@ -20,77 +18,55 @@ from view.schemas import (
     HealthResponse, RootResponse, UsuarioUpdateProfile, UsuarioChangePassword
 )
 
-# Agregar logger
 import logging
 logger = logging.getLogger(__name__)
 
-# Crear las tablas en PostgreSQL si no existen
-Base.metadata.create_all(bind=engine)
+def register_routes(app: FastAPI):
 
-# Crear la aplicación FastAPI
-app = FastAPI(title="API Usuarios, Favoritos, Visitas y Puntajes Noesis", version="2.0.0")
+    # Funciones auxiliares
+    def get_user_by_email(db: Session, email: str):
+        return db.query(Usuario).filter(Usuario.email == email).first()
 
-# Habilitar CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["*"],
-)
+    def get_user_by_username(db: Session, username: str):
+        return db.query(Usuario).filter(Usuario.username == username).first()
 
-# Funciones auxiliares
-def get_user_by_email(db: Session, email: str):
-    return db.query(Usuario).filter(Usuario.email == email).first()
+    def create_user(db: Session, username: str, email: str, password: str):
+        db_user = Usuario(username=username, email=email, password=password)
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
 
-# NUEVA función auxiliar para buscar por username
-def get_user_by_username(db: Session, username: str):
-    return db.query(Usuario).filter(Usuario.username == username).first()
+        db_puntaje = Puntaje(
+            usuario_id=db_user.id,
+            puntaje_obtenido=0,
+            puntaje_total=20,
+            nivel="Básico"
+        )
+        db.add(db_puntaje)
+        db.commit()
+        return db_user
 
-# Función create_user actualizada
-def create_user(db: Session, username: str, email: str, password: str):
-    db_user = Usuario(username=username, email=email, password=password)  # ← INCLUIR USERNAME
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    
-    # Crear puntaje inicial
-    db_puntaje = Puntaje(
-        usuario_id=db_user.id,
-        puntaje_obtenido=0,
-        puntaje_total=20,
-        nivel="Básico"
-    )
-    db.add(db_puntaje)
-    db.commit()
-    
-    return db_user
+    def _compare_levels(nivel_predicho: str, nivel_guardado: str) -> bool:
+        level_hierarchy = {"Básico": 1, "Intermedio": 2, "Avanzado": 3}
+        return level_hierarchy.get(nivel_predicho, 1) > level_hierarchy.get(nivel_guardado, 1)
 
-def _compare_levels(nivel_predicho: str, nivel_guardado: str) -> bool:
-    """Comparar si el nivel predicho es mejor que el guardado"""
-    level_hierarchy = {"Básico": 1, "Intermedio": 2, "Avanzado": 3}
-    return level_hierarchy.get(nivel_predicho, 1) > level_hierarchy.get(nivel_guardado, 1)
+    def _generate_user_recommendation(puntaje: Puntaje, prediction: dict) -> str:
+        nivel_predicho = prediction['nivel_predicho']
+        nivel_guardado = puntaje.nivel
+        porcentaje = prediction['porcentaje']
+        confianza = prediction.get('confianza', 0)
 
-def _generate_user_recommendation(puntaje: Puntaje, prediction: dict) -> str:
-    """Generar recomendación personalizada para el usuario"""
-    nivel_predicho = prediction['nivel_predicho']
-    nivel_guardado = puntaje.nivel
-    porcentaje = prediction['porcentaje']
-    confianza = prediction.get('confianza', 0)
-    
-    if nivel_predicho == nivel_guardado:
-        if porcentaje >= 80:
-            return f"¡Excelente! Tu nivel {nivel_predicho} está bien consolidado. Considera intentar contenido más avanzado."
-        elif porcentaje >= 60:
-            return f"Tu nivel {nivel_predicho} es correcto. Practica más para fortalecer tus conocimientos."
+        if nivel_predicho == nivel_guardado:
+            if porcentaje >= 80:
+                return f"¡Excelente! Tu nivel {nivel_predicho} está bien consolidado. Considera intentar contenido más avanzado."
+            elif porcentaje >= 60:
+                return f"Tu nivel {nivel_predicho} es correcto. Practica más para fortalecer tus conocimientos."
+            else:
+                return f"Tu nivel {nivel_predicho} necesita refuerzo. Te recomendamos más práctica en las áreas básicas."
+        elif _compare_levels(nivel_predicho, nivel_guardado):
+            return f"¡Felicidades! El modelo predice que has avanzado al nivel {nivel_predicho}. Continúa practicando para consolidar este progreso."
         else:
-            return f"Tu nivel {nivel_predicho} necesita refuerzo. Te recomendamos más práctica en las áreas básicas."
-    
-    elif _compare_levels(nivel_predicho, nivel_guardado):
-        return f"¡Felicidades! El modelo predice que has avanzado al nivel {nivel_predicho}. Continúa practicando para consolidar este progreso."
-    
-    else:
-        return f"El modelo sugiere revisar contenido de nivel {nivel_predicho}. Esto puede ser temporal, sigue practicando."
+            return f"El modelo sugiere revisar contenido de nivel {nivel_predicho}. Esto puede ser temporal, sigue practicando."
 
 
 # Endpoints de usuarios
