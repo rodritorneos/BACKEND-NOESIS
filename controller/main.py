@@ -4,14 +4,14 @@ from sqlalchemy.orm import Session
 from typing import List
 
 # Agregar estos imports al inicio
-from model_predict import predictor
-from schemas import ModelPredictRequest, ModelPredictResponse, ModelStatsResponse
+from service.model_predict import predictor
+from view.schemas import ModelPredictRequest, ModelPredictResponse, ModelStatsResponse
 
-from schemas import ModelPredictUserRequest, ModelPredictUserResponse, ModelUserStatsResponse
+from view.schemas import ModelPredictUserRequest, ModelPredictUserResponse, ModelUserStatsResponse
 
-from database import engine, get_db
-from models import Usuario, Favorito, Visita, Puntaje, Base
-from schemas import (
+from database.database import engine, get_db
+from models.models import Usuario, Favorito, Visita, Puntaje, Base
+from view.schemas import (
     UsuarioRegistro, UsuarioLogin, UsuarioResponse, UsuarioInfo, 
     FavoritoRequest, FavoritoResponse, FavoritosUsuarioResponse, FavoritoAddResponse,
     VisitaRequest, VisitaResponse, VisitasUsuarioResponse,
