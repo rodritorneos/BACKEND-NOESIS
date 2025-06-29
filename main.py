@@ -5,6 +5,7 @@ from models.models import Base
 from controller.routes import register_routes
 import logging
 
+
 # Crear las tablas en PostgreSQL si no existen
 Base.metadata.create_all(bind=engine)
 

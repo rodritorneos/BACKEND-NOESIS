@@ -1,23 +1,38 @@
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 
+# Predictor del modelo
 from service.model_predict import predictor
+
+# Schemas del modelo de predicción
 from view.schemas import (
     ModelPredictRequest, ModelPredictResponse, ModelStatsResponse,
-    ModelPredictUserRequest, ModelPredictUserResponse, ModelUserStatsResponse,
+    ModelPredictUserRequest, ModelPredictUserResponse, ModelUserStatsResponse
+)
+
+# Base de datos y modelos
+from database.database import engine, get_db
+from models.models import Usuario, Favorito, Visita, Puntaje, Base, Docente
+
+# Schemas generales (usuario, docente, etc.)
+from view.schemas import (
     UsuarioRegistro, UsuarioLogin, UsuarioResponse, UsuarioInfo,
+    UsuarioUpdateProfile, UsuarioChangePassword,
     FavoritoRequest, FavoritoResponse, FavoritosUsuarioResponse, FavoritoAddResponse,
     VisitaRequest, VisitaResponse, VisitasUsuarioResponse,
     PuntajeRequest, PuntajeResponse, PuntajeUpdateResponse,
     MessageResponse, RegistroResponse, LoginResponse,
-    HealthResponse, RootResponse, UsuarioUpdateProfile, UsuarioChangePassword
+    HealthResponse, RootResponse,
+    DocenteRegistro, DocenteLogin, DocenteResponse, DocenteInfo
 )
-from database.database import engine, get_db
-from models.models import Usuario, Favorito, Visita, Puntaje, Base
+
+# Utilidades adicionales
 from sqlalchemy import func, case, desc
 from datetime import datetime, timedelta
 
+# Logging
 import logging
 logger = logging.getLogger(__name__)
 
