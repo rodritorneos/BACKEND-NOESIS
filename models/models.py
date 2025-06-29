@@ -51,7 +51,7 @@ class Puntaje(Base):
     usuario = relationship("Usuario", back_populates="puntajes")
 
 class Docente(Base):
-    _tablename_ = "docentes"
+    __tablename__ = "docentes"
     
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
