@@ -143,3 +143,47 @@ class ModelUserStatsResponse(BaseModel):
     prediccion_actual: dict
     estadisticas_modelo: dict
     recomendacion: str
+
+class DocenteRegistro(BaseModel):
+    username: str
+    email: str
+    password: str
+    institucion: str = "CCJCALLAO"
+
+class DocenteLogin(BaseModel):
+    email: str
+    password: str
+
+class DocenteResponse(BaseModel):
+    username: str
+    email: str
+    password: str
+    institucion: str
+
+class DocenteInfo(BaseModel):
+    username: str
+    email: str
+    institucion: str
+
+class EstudianteEstadistica(BaseModel):
+    username: str
+    email: str
+    puntaje_obtenido: int
+    puntaje_total: int
+    nivel: str
+    fecha_ultima_actividad: str
+    lecciones_completadas: int
+
+class EstadisticasGenerales(BaseModel):
+    promedio_general: float
+    total_estudiantes: int
+    estudiantes_activos: int
+    distribucion_niveles: dict
+
+class ProgresoEstudiantes(BaseModel):
+    estudiantes: List[EstudianteEstadistica]
+    total: int
+
+class DashboardDocenteResponse(BaseModel):
+    estadisticas_generales: EstadisticasGenerales
+    progreso_estudiantes: ProgresoEstudiantes

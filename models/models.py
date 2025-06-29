@@ -49,3 +49,12 @@ class Puntaje(Base):
     
     # Relación
     usuario = relationship("Usuario", back_populates="puntajes")
+
+class Docente(Base):
+    _tablename_ = "docentes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password = Column(String, nullable=False)
+    institucion = Column(String, default="CCJCALLAO", nullable=False)
